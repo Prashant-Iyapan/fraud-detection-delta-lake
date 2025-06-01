@@ -27,9 +27,9 @@ class Transformation:
             StructField('is_new_user', BooleanType(), True),
             StructField('referral_code', StringType(), True),
             StructField('session_id', StringType(), True),
-			StructField('hash_ip', StringType(), True),
-			StructField('hash_card_number', StringType(), True),
-			StructField('card_number', StringType(), True),
+            StructField('hash_ip', StringType(), True),
+            StructField('hash_card_number', StringType(), True),
+            StructField('card_number', StringType(), True),
             StructField('event_date', DateType(), True)          
             ])
         self.lkp_ip_risk_df = self.spark.read.csv(lkp_ip_risk, header=True,inferSchema=True)
