@@ -1,8 +1,8 @@
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType, DoubleType, BooleanType, TimestampType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType, DoubleType, BooleanType, TimestampType, DateType
 from src.logger import create_logger
 from pyspark.sql import SparkSession
 from src.config import *
-from pyspark.sql.functions import col, when, broadcast
+from pyspark.sql.functions import col, when, broadcast, current_date, lit
 from src.data_quality import run_data_quality, custom_silver_dq_check
 from src.validation import expected_schema_silver
 from datetime import datetime
@@ -21,32 +21,35 @@ class Transformation:
             StructField('subscription_type', StringType(), True),
             StructField('amount', DoubleType(), True),
             StructField('location', StringType(), True),
-            StructField('ip_address', StringType(), True),
             StructField('device_id', StringType(), True),
             StructField('payment_method', StringType(), True),
-            StructField('card_number', StringType(), True),
             StructField('currency',StringType(), True),
             StructField('is_new_user', BooleanType(), True),
             StructField('referral_code', StringType(), True),
-            StructField('session_id', StringType(), True)            
+            StructField('session_id', StringType(), True),
+			StructField('hash_ip', StringType(), True),
+			StructField('hash_card_number', StringType(), True),
+			StructField('card_number', StringType(), True),
+            StructField('event_date', DateType(), True)          
             ])
         self.lkp_ip_risk_df = self.spark.read.csv(lkp_ip_risk, header=True,inferSchema=True)
         self.prod_list_df = self.spark.read.csv(lkp_prod_list, header=True,inferSchema=True)
         self.subs_plan_df = self.spark.read.csv(lkp_subs_plan, header=True, inferSchema=True)
         self.user_list_df = self.spark.read.csv(lkp_users, header=True, inferSchema=True)
-        
-        
-    def read_bronze_data(self):
-        self.transform_logger.info(f'Reading data from {self.source_file}')
-        try:
-            df = self.spark.read.format('delta').load(self.source_file)         
-            self.transform_logger.info('Bronze data loaded into Dataframe Now')
-            return df
-        except Exception as e:
-            self.transform_logger.exception(f'Error occured while reading data from {self.source_file} and the exception: {e}')
-            return None
-        
+        print("User list count:", self.user_list_df.count())
+        print("Product list count:", self.prod_list_df.count())
+        print("Subscription plan count:", self.subs_plan_df.count())
+        print("IP risk list count:", self.lkp_ip_risk_df.count())
 
+    def process_silver_batch(self, silver_df, batch_id):
+        if silver_df.isEmpty():
+            self.transform_logger.info(f"Batch {batch_id} is empty. Skipping.")
+            return
+        enriched_silver_df = self.enrich_with_lookups(silver_df)
+        self.transform_logger.info('Completed Silver Transformations Proceeding for DQ')
+        self.run_dq_silver(enriched_silver_df)
+        enriched_silver_df.write.mode('append').format('delta').partitionBy('event_date').save(silver_write_path)
+    
     def enrich_with_lookups(self, df):
         df.printSchema()
         df = df.alias('bronze')
@@ -54,24 +57,36 @@ class Transformation:
         risk_df = df.join(broadcast(self.user_list_df), col('bronze.user_id') == col('user_list.user_id'), how='left')
         risk_df = risk_df.withColumn('missing_user', when(col('user_list.user_id').isNull(), True).otherwise(False))
         risk_df = risk_df.select(col('bronze.*'),col('user_list.country'),col('user_list.user_status'), col('missing_user')).alias('risk')
+        risk_df= risk_df.alias('risk')
+        
         #print(risk_df.columns)
+        self.prod_list_df = self.prod_list_df.withColumnRenamed('product_id', 'product_id_look_up')
         self.prod_list_df = self.prod_list_df.alias('prod_list')
-        risk_prod_df = risk_df.join(broadcast(self.prod_list_df), col('risk.product_id') == col('prod_list.product_id'), how='left')
-        risk_prod_df = risk_prod_df.withColumn('missing_product', when(col('prod_list.product_id').isNull(), True).otherwise(False))
+        risk_prod_df = risk_df.join(broadcast(self.prod_list_df), col('risk.product_id') == col('prod_list.product_id_look_up'), how='left')
+        risk_prod_df = risk_prod_df.withColumn('missing_product', when(col('prod_list.product_id_look_up').isNull(), True).otherwise(False))
         risk_prod_df = risk_prod_df.select(col('risk.*'), col('prod_list.product_name'), col('prod_list.category'), col('prod_list.price'), col('missing_product')).alias('risk_prod')
+        risk_prod_df = risk_prod_df.alias('risk_prod')
         #print(risk_prod_df.columns)
+        
+        self.subs_plan_df = self.subs_plan_df.withColumnRenamed('subscription_type', 'subscription_type_look_up')
         self.subs_plan_df = self.subs_plan_df.alias('subs_plan')
-        risk_prod_sub_df = risk_prod_df.join(broadcast(self.subs_plan_df), col('risk_prod.subscription_type') == col('subs_plan.subscription_type'), how='left')
-        risk_prod_sub_df = risk_prod_sub_df.withColumn('missing_subscription', when(col('subs_plan.subscription_type').isNull(), True).otherwise(False))
+        risk_prod_sub_df = risk_prod_df.join(broadcast(self.subs_plan_df), col('risk_prod.subscription_type') == col('subs_plan.subscription_type_look_up'), how='left')
+        risk_prod_sub_df = risk_prod_sub_df.withColumn('missing_subscription', when(col('subs_plan.subscription_type_look_up').isNull(), True).otherwise(False))
         risk_prod_sub_df = risk_prod_sub_df.select(col('risk_prod.*'), col('subs_plan.monthly_cost'),col('subs_plan.churn_risk'), col('subs_plan.plan_duration'),col('missing_subscription')).alias('risk_prod_sub')
+        risk_prod_sub_df = risk_prod_sub_df.alias('risk_prod_sub')
         #print(risk_prod_sub_df.columns)
+        
         self.lkp_ip_risk_df = self.lkp_ip_risk_df.alias('ip_risk')
         ip_prod_risk_sub_df = risk_prod_sub_df.join(broadcast(self.lkp_ip_risk_df), col('risk_prod_sub.hash_ip') == col('ip_risk.ip_hash'), how = 'left')
         ip_prod_risk_sub_df = ip_prod_risk_sub_df.withColumn('missing_ip', when(col('ip_risk.ip_hash').isNull(), True).otherwise(False))
-        ip_prod_risk_sub_df = ip_prod_risk_sub_df.select(col('risk_prod_sub.*'), col('ip_risk.risk_level'), col('ip_risk.risk_score'), col('missing_ip')).alias('risk_prod_sub_ip')
+        ip_prod_risk_sub_df = ip_prod_risk_sub_df.select(col('risk_prod_sub.*'), col('ip_risk.risk_level'), col('ip_risk.risk_score').cast(DoubleType()), col('ip_risk.location').alias('ip_risk_location'), col('missing_ip'))
         final_silver_df = ip_prod_risk_sub_df.withColumn('usage_cost_ratio', col('amount')/col('monthly_cost'))
         final_silver_df.printSchema()
+        final_silver_df.show(n=5)
         return final_silver_df
+        
+
+
     
     def run_dq_silver(self, df):
         self.transform_logger.info("Prepping encriched Silver dataframe for Data Quality Check")
@@ -86,10 +101,14 @@ class Transformation:
     
     def write_to_silver(self,df):
         self.transform_logger.info("We are starting to our write into Silver layer")
-        df.write.format('delta').mode('append').save(silver_write_path)
+        silver_query=df.writeStream.format('delta')\
+        .outputMode('append')\
+        .option('checkpointLocation', silver_check_point_path)\
+        .option('badRecordsPath', silver_bad_records_path)\
+        .foreachBatch(self.process_silver_batch)\
+        .start()
+        silver_query.awaitTermination()
         self.transform_logger.info("We have successfully written into Silver layer")
-        
 
-        
 
 

@@ -1,0 +1,30 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PySpark checkpoint and bad records
+**/checkpoint/
+**/badRecordsPath/
+
+# Logs
+*.log
+
+# Environment files
+.env
+*.env
+
+# Mac & Linux system files
+.DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode & PyCharm IDE
+.vscode/
+.idea/
+
+# Python virtualenvs
+.venv/
+venv/

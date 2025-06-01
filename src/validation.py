@@ -41,6 +41,7 @@ expected_schema_silver = {
     'usage_cost_ratio': 'DoubleType'
 }
 
+
 val_logger = create_logger('validation')
 
 
