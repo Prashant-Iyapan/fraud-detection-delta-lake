@@ -3,49 +3,54 @@
 
 ## 📌 Purpose
 
-This module validates schema integrity for incoming streaming data frames, particularly at the Bronze and Silver layers. It ensures that both column names and their data types conform to expected definitions.
+This module provides schema validation for incoming DataFrames at both the **Bronze (Ingestion)** and **Silver (Transformation)** layers. It enforces strict schema expectations by comparing column names and data types against predefined schemas.
 
 ---
 
 ## ⚙️ Core Logic and Steps
 
-1. **Define expected schemas** as dictionaries:
-   - `expected_schema_bronze`: Expected structure for Bronze layer input.
-   - `expected_schema_silver`: Expected structure for Silver layer after enrichment.
+1. **Define expected schemas**:
+   - `expected_schema_bronze`: For raw input validation before Bronze ingestion.
+   - `expected_schema_silver`: For enriched output after Silver transformations.
 
-2. **`validate_columns(val_dataframe)`**:
-   - Iterates through the `expected_schema_bronze`.
-   - Confirms that each required column exists in the DataFrame.
-   - Checks if the datatype matches what is defined in the schema.
-   - Logs mismatches or confirmations for transparency.
+2. **Function: `validate_columns(df, module='Ingestion')`**
+   - Accepts a DataFrame and a `module` name (`Ingestion` for Bronze, anything else for Silver).
+   - Iterates over the corresponding schema and checks:
+     - If each column exists in the DataFrame
+     - If the data type matches the expected type
+   - Logs all validation status and mismatches.
+
+3. **Returns**:
+   - `True` if all validations pass.
+   - `False` if any column is missing or mismatched.
 
 ---
 
 ## 📥 Inputs
 
-- **DataFrame (`val_dataframe`)**: The DataFrame being validated (typically Bronze layer input).
-- **Schemas**: Defined as dictionaries mapping column names to Spark data type names (as strings).
+- **DataFrame (`val_dataframe`)**: The DataFrame to be validated.
+- **Module (`module`)**: Determines whether to validate against Bronze or Silver schema.
 
 ---
 
 ## 📤 Outputs
 
-- Returns `True` if the schema matches expectations.
-- Returns `False` if any column is missing or the data type mismatches.
-- Logs the schema match status for each column.
+- Boolean `True` or `False` indicating whether schema validation succeeded.
+- Logs all outcomes for each column using `val_logger`.
 
 ---
 
 ## 🧩 Optional Parameters and Configs
 
-- Uses the `val_logger` from `logger.py` for structured logs.
-- Can be extended to validate nested structures or evolving schemas.
+- Uses `create_logger('validation')` for standardized logging.
+- Can be easily extended to support new layers (e.g., Gold) or nested schemas.
+- Currently uses hardcoded schema definitions; could be replaced by schema inference from a StructType if needed.
 
 ---
 
 ## 📝 Notes for Interviewers and Reviewers
 
-- Enforces **schema contracts** early in the pipeline, preventing downstream errors.
-- Encourages **transparent and traceable schema validation** with clear logs.
-- Centralizes expected schema definitions for **Bronze and Silver layers**, promoting reusability.
-- Simple but critical function for robust data pipeline design.
+- Implements **layer-specific validation logic** for stronger pipeline integrity.
+- **Fails early and loudly** if schema mismatches occur.
+- Ensures that newly added fields from lookup joins or enrichment are also validated.
+- Can be extended to support runtime schema auto-generation for more robustness.
