@@ -43,7 +43,7 @@ This script drives the Silver layer transformation pipeline. It waits for Bronze
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Demonstrates **event-time filtering** and **controlled ingestion** using retry loops.
 - Supports **partition-aware streaming reads** for efficient downstream processing.

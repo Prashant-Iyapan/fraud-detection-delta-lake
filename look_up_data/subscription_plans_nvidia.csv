@@ -1,0 +1,4 @@
+subscription_type,monthly_cost,churn_risk,plan_duration
+Free,0.0,Low,0
+Premium,29.99,Medium,12
+Trial,0.0,High,1

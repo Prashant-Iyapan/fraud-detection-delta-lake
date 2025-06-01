@@ -50,7 +50,7 @@ This module reads data from the Bronze layer, performs enrichment through multip
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Demonstrates real-world **data enrichment** through multiple broadcast joins.
 - Handles **referential integrity** gracefully by flagging missing foreign key references.

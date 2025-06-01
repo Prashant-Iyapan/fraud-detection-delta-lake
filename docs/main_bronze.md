@@ -40,7 +40,7 @@ This script serves as the entry point for the Bronze layer ingestion process. It
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Clean and minimal **driver script** for initiating Bronze ingestion.
 - Uses **object-oriented modular structure** by separating logic into `StreamIngestor`.

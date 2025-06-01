@@ -49,7 +49,7 @@ This script orchestrates the Gold layer processing. It waits for enriched Silver
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Shows **controlled event-driven orchestration** of downstream processing.
 - Applies **business rules** to generate KPI and risk metrics.

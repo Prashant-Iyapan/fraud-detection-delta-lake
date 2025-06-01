@@ -47,7 +47,7 @@ This module takes enriched Silver layer data and performs aggregations and risk 
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Implements **business-driven aggregations** for user and product analytics.
 - Applies **risk-based logic** for flagging anomalies.

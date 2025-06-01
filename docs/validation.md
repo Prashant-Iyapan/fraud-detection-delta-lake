@@ -48,7 +48,7 @@ This module provides schema validation for incoming DataFrames at both the **Bro
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Implements **layer-specific validation logic** for stronger pipeline integrity.
 - **Fails early and loudly** if schema mismatches occur.

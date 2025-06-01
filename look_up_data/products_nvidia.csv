@@ -1,0 +1,8 @@
+product_id,product_name,category,price
+P101,RTX 4090 GPU,Hardware,1499.0
+P102,Omniverse Subscription,Cloud Software,99.0
+P103,NVIDIA DLSS Plugin,AI SDK,0.0
+P104,CUDA Toolkit Enterprise,Developer Tools,299.0
+P105,NVIDIA DRIVE Platform,Automotive AI,4999.0
+P106,GeForce NOW Premium,Streaming Service,19.99
+P107,Jetson Nano Dev Kit,Edge AI,199.0

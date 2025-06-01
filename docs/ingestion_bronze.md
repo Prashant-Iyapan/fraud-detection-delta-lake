@@ -49,7 +49,7 @@ This module ingests raw JSON streaming data into the Bronze layer of a Delta Lak
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Implements real-world **data privacy best practices** (PII hashing and masking).
 - Uses **`foreachBatch`** to enable custom logic on streaming data.

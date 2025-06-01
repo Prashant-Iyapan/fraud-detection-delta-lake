@@ -40,7 +40,7 @@ This module provides a reusable logging utility that creates and configures logg
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Promotes **modular logging strategy** with support for both development (console) and production (file) use cases.
 - Prevents **handler duplication**, a common issue in Spark or multi-threaded apps.

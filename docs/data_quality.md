@@ -48,7 +48,7 @@ Each check returns structured results containing column name, check type, counts
 
 ---
 
-## 📝 Notes for Interviewers and Reviewers
+## 📝 Summary & Highlights
 
 - Implements a **modular, rule-based DQ system** suited for both Bronze and Silver layers.
 - Custom Silver checks show **business logic awareness**, e.g., ratio checks, missing reference fields.
