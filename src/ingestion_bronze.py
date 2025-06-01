@@ -60,7 +60,6 @@ class StreamIngestor:
                 self.ingestion_logger.info(f"Data Quality check failed for batch {batch_id}. Writing to DQ result folder")
                 self.spark.createDataFrame(run_dq).write.mode('append').format('json').save(bronze_dq_result_folder_w_time)
 
-
     def data_ingest(self):
         try:
             self.ingestion_logger.info(f"Reading from source path: {self.source_file}")

@@ -101,7 +101,6 @@ def custom_silver_dq_check(df, batch_id, total_rows):
                         'status': status})
     return loc_result
     
-
 def run_data_quality(df, batch_id, expected_schema, layer='bronze'):
     total_rows = df.count()
     results = []

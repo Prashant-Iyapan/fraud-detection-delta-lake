@@ -30,9 +30,7 @@ lkp_ip_risk = 's3a://prasanth-s3bucket-ver1/fraud_detection_data/lookup_data/ip_
 lkp_prod_list = 's3a://prasanth-s3bucket-ver1/fraud_detection_data/lookup_data/products_nvidia.csv'
 lkp_subs_plan = 's3a://prasanth-s3bucket-ver1/fraud_detection_data/lookup_data/subscription_plans_nvidia.csv'
 lkp_users = 's3a://prasanth-s3bucket-ver1/fraud_detection_data/lookup_data/users_nvidia.csv'
-format_patterns = {"ip_address": r"^\d{1,3}(\.\d{1,3}){3}$",
-    "card_number": r"^\d{12,19}$",
-    "currency": r"^[A-Z]{3}$"}
+format_patterns = {"card_number": r"^\d{12,19}$", "currency": r"^[A-Z]{3}$"}
 
 #PII
 pii_path = 's3a://prasanth-s3bucket-ver1/fraud_detection_data/delta/pii'

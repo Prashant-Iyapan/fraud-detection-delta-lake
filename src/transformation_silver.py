@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession
 from src.config import *
 from pyspark.sql.functions import col, when, broadcast, current_date, lit
 from src.data_quality import run_data_quality, custom_silver_dq_check
-from src.validation import expected_schema_silver
+from src.validation import expected_schema_silver, validate_columns
 from datetime import datetime
 
 class Transformation:
@@ -36,18 +36,22 @@ class Transformation:
         self.prod_list_df = self.spark.read.csv(lkp_prod_list, header=True,inferSchema=True)
         self.subs_plan_df = self.spark.read.csv(lkp_subs_plan, header=True, inferSchema=True)
         self.user_list_df = self.spark.read.csv(lkp_users, header=True, inferSchema=True)
-        print("User list count:", self.user_list_df.count())
-        print("Product list count:", self.prod_list_df.count())
-        print("Subscription plan count:", self.subs_plan_df.count())
-        print("IP risk list count:", self.lkp_ip_risk_df.count())
+        self.transform_logger.info("Checking Look-up data Availability")
+        self.transform_logger.info(f'User list count: {self.user_list_df.count()}')
+        self.transform_logger.info(f'Product list count: {self.prod_list_df.count()}')
+        self.transform_logger.info(f'Subscription plan count: {self.subs_plan_df.count()}')
+        self.transform_logger.info(f'IP risk list count: {self.lkp_ip_risk_df.count()}')
 
     def process_silver_batch(self, silver_df, batch_id):
         if silver_df.isEmpty():
             self.transform_logger.info(f"Batch {batch_id} is empty. Skipping.")
             return
         enriched_silver_df = self.enrich_with_lookups(silver_df)
-        self.transform_logger.info('Completed Silver Transformations Proceeding for DQ')
-        self.run_dq_silver(enriched_silver_df)
+        self.transform_logger.info('Completed Silver Transformations Proceeding for Schema Validation')
+        if validate_columns(enriched_silver_df, self.module):
+            self.run_dq_silver(enriched_silver_df)
+        else: 
+            raise ValueError (f'There is a schema mismatch after Transformation, Please check if enriched dataframe matches {expected_schema_silver}')
         enriched_silver_df.write.mode('append').format('delta').partitionBy('event_date').save(silver_write_path)
     
     def enrich_with_lookups(self, df):
@@ -59,14 +63,12 @@ class Transformation:
         risk_df = risk_df.select(col('bronze.*'),col('user_list.country'),col('user_list.user_status'), col('missing_user')).alias('risk')
         risk_df= risk_df.alias('risk')
         
-        #print(risk_df.columns)
         self.prod_list_df = self.prod_list_df.withColumnRenamed('product_id', 'product_id_look_up')
         self.prod_list_df = self.prod_list_df.alias('prod_list')
         risk_prod_df = risk_df.join(broadcast(self.prod_list_df), col('risk.product_id') == col('prod_list.product_id_look_up'), how='left')
         risk_prod_df = risk_prod_df.withColumn('missing_product', when(col('prod_list.product_id_look_up').isNull(), True).otherwise(False))
         risk_prod_df = risk_prod_df.select(col('risk.*'), col('prod_list.product_name'), col('prod_list.category'), col('prod_list.price'), col('missing_product')).alias('risk_prod')
         risk_prod_df = risk_prod_df.alias('risk_prod')
-        #print(risk_prod_df.columns)
         
         self.subs_plan_df = self.subs_plan_df.withColumnRenamed('subscription_type', 'subscription_type_look_up')
         self.subs_plan_df = self.subs_plan_df.alias('subs_plan')
@@ -74,7 +76,6 @@ class Transformation:
         risk_prod_sub_df = risk_prod_sub_df.withColumn('missing_subscription', when(col('subs_plan.subscription_type_look_up').isNull(), True).otherwise(False))
         risk_prod_sub_df = risk_prod_sub_df.select(col('risk_prod.*'), col('subs_plan.monthly_cost'),col('subs_plan.churn_risk'), col('subs_plan.plan_duration'),col('missing_subscription')).alias('risk_prod_sub')
         risk_prod_sub_df = risk_prod_sub_df.alias('risk_prod_sub')
-        #print(risk_prod_sub_df.columns)
         
         self.lkp_ip_risk_df = self.lkp_ip_risk_df.alias('ip_risk')
         ip_prod_risk_sub_df = risk_prod_sub_df.join(broadcast(self.lkp_ip_risk_df), col('risk_prod_sub.hash_ip') == col('ip_risk.ip_hash'), how = 'left')
@@ -85,9 +86,6 @@ class Transformation:
         final_silver_df.show(n=5)
         return final_silver_df
         
-
-
-    
     def run_dq_silver(self, df):
         self.transform_logger.info("Prepping encriched Silver dataframe for Data Quality Check")
         run_dq = run_data_quality(df, 'silver', expected_schema_silver, layer = 'silver')
@@ -97,8 +95,7 @@ class Transformation:
         silver_dq_result_folder_w_time = f'{silver_dq_result_folder}/{formatted_time}'
         self.spark.createDataFrame(run_dq).write.mode('append').json(silver_dq_result_folder_w_time)
         self.transform_logger.info(f"DQ Results written to: {silver_dq_result_folder_w_time}")
-
-    
+  
     def write_to_silver(self,df):
         self.transform_logger.info("We are starting to our write into Silver layer")
         silver_query=df.writeStream.format('delta')\

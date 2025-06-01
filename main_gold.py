@@ -6,10 +6,9 @@ from src.enrichment_gold import Enrichment
 from delta.tables import DeltaTable
 import time
 
-
 gold_main_logger = create_logger('gold_main')
 
-def wait_for_silver_data(spark, path, retries=10, wait_secs=30):
+def wait_for_silver_data(spark, path, retries=50, wait_secs=5):
     gold_main_logger.info("Waiting for data from silver")
     for i in range(retries):
         gold_main_logger.info(f'Attempting Silver data fetch: {i+1}/{retries} retries.')
@@ -22,6 +21,7 @@ def wait_for_silver_data(spark, path, retries=10, wait_secs=30):
                 pass
         time.sleep(wait_secs)
     return False
+    
 def read_silver_stream_data_per_date(spark, path, event_date, logger):
     logger.info('Reading the Source file from Silver path')
     try:

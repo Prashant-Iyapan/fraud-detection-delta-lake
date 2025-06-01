@@ -1,6 +1,5 @@
 import logging
 from src.config import log_path,formatter_format
-
 from logging import StreamHandler,FileHandler,Formatter
 
 def create_logger(module, file_needed=False):

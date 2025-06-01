@@ -5,7 +5,7 @@ from src.transformation_silver import Transformation
 from src.config import *
 from pyspark.sql.functions import col, lit
 
-def wait_for_bronze_data(spark, path, retries=10, wait_secs=30):
+def wait_for_bronze_data(spark, path, retries=30, wait_secs=5):
     print("Waiting for data from Bronze")
     for i in range(retries):
         print(f'Done with {i+1}/{retries} retries.')
@@ -29,6 +29,7 @@ def read_bronze_stream_data_per_date(spark, path, event_date, logger):
     except Exception as e:
         logger.exception(f'Error occured while reading data from {path} and the exception: {e}')
         return None
+    
 def main():
     silver_main_logger = create_logger("silver_main")
     stream_silver = Transformation(silver_read_path)
