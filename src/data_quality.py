@@ -1,9 +1,20 @@
+'''
+------------------------------------------------------------
+Data Quality Module
+------------------------------------------------------------
+Provides reusable quality checks for Bronze and Silver layers.
+Checks include: nulls, range validation, format patterns,
+and domain-specific custom logic for enriched Silver datasets.
+------------------------------------------------------------
+'''
+
 from src.logger import create_logger
 from pyspark.sql.functions import col
 from src.config import format_patterns
 
 DQ_logger = create_logger('Data_Quality')
 
+# Null Check: Validates presence of nulls in expected columns
 def check_nulls(df, batch_id, total_rows, expected_schema):
     loc_result = []
     for col_name in expected_schema:
@@ -21,6 +32,7 @@ def check_nulls(df, batch_id, total_rows, expected_schema):
                             'status': status})
     return loc_result
 
+# Range Check: Flags values outside allowed numeric bounds
 def check_range(df, batch_id, total_rows):
     loc_result = []
     range_count = df.filter(col('amount') <= 0).count()
@@ -36,6 +48,7 @@ def check_range(df, batch_id, total_rows):
                         'status': status})
     return loc_result
 
+# Format Check: Validates format via regex for selected columns
 def check_format(df, batch_id, total_rows):
     loc_result = []
     for col_name, pattern in format_patterns.items():
@@ -52,9 +65,13 @@ def check_format(df, batch_id, total_rows):
                                 'format_percent': format_percent,
                                 'status': status})
     return loc_result
+
+# Custom Silver-Level Checks: Business and domain-specific
 def custom_silver_dq_check(df, batch_id, total_rows):
     loc_result = []
     DQ_logger.info('Running Custom Data Quality Checks')
+
+    # Check 1: usage_cost_ratio should be positive
     usage_cost_ratio_count = df.filter((col('usage_cost_ratio').isNull()) | (col('usage_cost_ratio') <=0)).count()
     usage_cost_ratio_percent = (usage_cost_ratio_count/total_rows)* 100
     status = 'fail' if usage_cost_ratio_percent > 0 else 'pass'
@@ -66,6 +83,8 @@ def custom_silver_dq_check(df, batch_id, total_rows):
                         'violation_count': usage_cost_ratio_count,
                         'violation_percent': usage_cost_ratio_percent,
                         'status': status})
+    
+    # Check 2: High-risk + low usage cost ratio combo
     high_risk_low_usage_count = df.filter((col('usage_cost_ratio') < 0.2) & (col('risk_score') > 80)).count()
     high_risk_low_usage_percent = (high_risk_low_usage_count/total_rows)*100
     status = 'fail' if high_risk_low_usage_percent > 0 else 'pass'
@@ -77,6 +96,8 @@ def custom_silver_dq_check(df, batch_id, total_rows):
                         'violation_count': high_risk_low_usage_count,
                         'violation_percent': high_risk_low_usage_percent,
                         'status': status})
+    
+    # Check 3: Amount present but no monthly cost
     amount_w_o_monthly_cost = df.filter((col('amount').isNotNull()) & (col('monthly_cost').isNull())).count()
     amount_w_o_monthly_cost_percent = (amount_w_o_monthly_cost/total_rows)*100
     status = 'fail' if amount_w_o_monthly_cost_percent > 0 else 'pass'
@@ -88,6 +109,8 @@ def custom_silver_dq_check(df, batch_id, total_rows):
                         'violation_count': amount_w_o_monthly_cost,
                         'violation_percent': amount_w_o_monthly_cost_percent,
                         'status': status})
+    
+    # Check 4: Amount present but missing currency
     missing_currency_with_amount = df.filter((col('amount') > 0) & (col('currency').isNull())).count()
     missing_currency_with_amount_percent = (missing_currency_with_amount/total_rows)*100
     status = 'fail' if missing_currency_with_amount_percent > 0 else 'pass'
@@ -100,13 +123,16 @@ def custom_silver_dq_check(df, batch_id, total_rows):
                         'violation_percent': missing_currency_with_amount_percent,
                         'status': status})
     return loc_result
-    
+
+# Driver Function: Run all applicable DQ checks
 def run_data_quality(df, batch_id, expected_schema, layer='bronze'):
     total_rows = df.count()
     results = []
     results.extend(check_nulls(df, batch_id, total_rows, expected_schema))
     results.extend(check_range(df, batch_id, total_rows))
     results.extend(check_format(df, batch_id, total_rows))
+
+    # Run additional checks for Silver layer
     if layer == 'silver': 
         results.extend(custom_silver_dq_check(df, batch_id, total_rows))
     return results

@@ -6,6 +6,14 @@ from pyspark.sql.functions import col, sum, avg, when, lit
 from delta.tables import DeltaTable
 
 class Enrichment:
+    """
+    Gold layer enrichment class.
+
+    Responsibilities:
+    - Initializes Spark session for Gold transformations.
+    - Defines schema for fully enriched Silver records (post all lookups).
+    - Sets up logger for audit and transformation monitoring.
+    """    
     def __init__(self, source_path):
         self.spark = SparkSession.builder.appName('gold').getOrCreate()
         self.enrichment_logger = create_logger('Enrichment')
@@ -43,19 +51,22 @@ class Enrichment:
         StructField('missing_ip', BooleanType(),True),
         StructField('usage_cost_ratio', DoubleType(),True)])
         self.source_path = source_path
-        
+
+    # Aggregation: Total spend per user per day    
     def user_spend_summary(self,df):
         self.enrichment_logger.info('Calculating the spend summary for each user')
         spend_summary_df = df.groupBy(col('user_id'), col('event_date')).agg(sum(col('amount')).alias('Total_spent_per_user'))
         spend_summary_df.printSchema()
         return spend_summary_df
     
+    # Aggregation: Average usage cost ratio per product per day.
     def product_usage_metrics(self, df):
         self.enrichment_logger.info('Calculating the usage metrics for each product')
         usage_metrics_df = df.groupBy(col('product_id'), col('event_date')).agg(avg(col('usage_cost_ratio')).alias('average_usage_cost_ratio'))
         usage_metrics_df.printSchema()
         return usage_metrics_df
     
+    # Alert: Flag high risk transactions
     def flag_high_risk_txns(self, df):
         self.enrichment_logger.info('Flagging High Risk Transactions now')
         high_risk_txn_df = df.withColumn('is_high_risk_txn', when((col('risk_level') == 'high') & (col('usage_cost_ratio') < 0.2), True).otherwise(False))
@@ -65,6 +76,7 @@ class Enrichment:
     def process_gold_batch(self, silver_data_df, batch_id):
         self.enrichment_logger.info(f'Processing silver to gold batch: {batch_id}')
         try:
+            # Check Batch Sanity and perform enrichments
             if silver_data_df is not None:
                 spend_summary_df = self.user_spend_summary(silver_data_df)
                 usage_metrics_df = self.product_usage_metrics(silver_data_df)
@@ -78,6 +90,7 @@ class Enrichment:
             self.enrichment_logger.exception(f'Got an issue {e} while running the gold pipeline for batch {batch_id}')
 
     def optimize_and_vacuum(self):
+        # Improve performance of Delta table and clean up old versions
         DeltaTable.forPath(self.spark, gold_write_path_high_risk_txns).vacuum(168)
         DeltaTable.forPath(self.spark, gold_write_path_spend_summary).vacuum(168)
         DeltaTable.forPath(self.spark, gold_write_path_product_usage_metrics).vacuum(168)
@@ -95,3 +108,28 @@ class Enrichment:
         if optimize:
             self.optimize_and_vacuum()
 
+# ------------------------------------------------------------
+#  Future Enhancements
+# ------------------------------------------------------------
+# 1. Add churn_risk_score and retention_score based on usage drop + support flags
+#    - Requires user activity history + support logs (Silver joins or new source)
+#
+# 2. Include is_power_user and is_early_adopter flags using behavioral thresholds
+#    - Define clear thresholds (e.g., usage_count > 100, product adoption < 30 days)
+#
+# 3. Generate CLTV estimation per user for marketing/finance use cases
+#    - Use monthly_spend averages × projected duration (12/24 months)
+#
+# 4. Track geo risk indicators: device spread, IP mismatch, high-risk locations
+#    - Use risk_score + enriched IP location metadata
+#
+# 5. Include compliance metadata: pii_encrypted, gdpr_user_consent
+#    - Add explicit boolean flags during Silver enrichment
+#
+# 6. Add anomaly classification for high-risk transactions (e.g., velocity_attack)
+#    - Use rule-based or ML-assisted classification to label patterns
+#
+# 7. Partition or Z-Order using user_id and event_date for performance tuning
+#    - Monitor file size skew + query latency to choose optimal sort keys
+# 8. Introduce Data Quality Checks for Aggregated Gold Data frames before Dashboarding
+# ------------------------------------------------------------

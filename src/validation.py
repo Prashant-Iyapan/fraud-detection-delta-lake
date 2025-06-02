@@ -1,5 +1,11 @@
 from src.logger import create_logger
 
+# ------------------------------------------------------------
+# Expected Schema Definitions for Bronze and Silver Layers
+# Used in validation logic to ensure incoming dataframes 
+# conform to the correct structure before transformations.
+# ------------------------------------------------------------
+
 expected_schema_bronze = {
     'transaction_id': 'StringType',
     'event_time': 'TimestampType',

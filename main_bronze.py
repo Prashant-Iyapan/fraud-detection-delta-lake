@@ -1,3 +1,11 @@
+# ------------------------------------------------------------
+# Bronze Layer Entry Point
+# ------------------------------------------------------------
+# This script initializes the ingestion process for streaming data.
+# It uses the StreamIngestor class to read raw input and store it
+# to Bronze-level Delta tables for downstream Silver and Gold processing.
+# ------------------------------------------------------------
+
 from src.logger import create_logger
 from src.ingestion_bronze import StreamIngestor
 from src.config import stream_file, silver_read_path, gold_read_path
